@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bluetooth Notification Example (カラオケ現在曲目取得)</title>
+  <title>Bluetooth RX/TX Notification Example</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -24,21 +24,25 @@
 </head>
 <body>
 
-  <h1>Bluetooth Notifications</h1>
+  <h1>Bluetooth RX/TX Notifications</h1>
 
   <label for="service">Service UUID: </label>
-  <input type="text" id="service" value="8371c46d-9796-4a80-9411-cc738dcdb5ee" placeholder="e.g., 8371c46d-9796-4a80-9411-cc738dcdb5ee"><br><br>
+  <input type="text" id="service" value="8371c46d-9796-4a80-9411-cc738dcdb5ee" placeholder="e.g., 0x180D"><br><br>
 
-  <label for="characteristic">Characteristic UUID: </label>
-  <input type="text" id="characteristic" value="d29c26db-e005-4345-ac6b-bb13c363b6b8" placeholder="e.g., d29c26db-e005-4345-ac6b-bb13c363b6b8"><br><br>
+  <label for="rx-characteristic">RX Characteristic UUID: </label>
+  <input type="text" id="rx-characteristic" value="6E400002-B5A3-F393-EOA9-E50E24DCCA9E" placeholder="e.g., 0x2A37"><br><br>
 
-  <button onclick="onStartButtonClick()">Start Notifications</button>
-  <button onclick="onStopButtonClick()">Stop Notifications</button>
+  <label for="tx-characteristic">TX Characteristic UUID: </label>
+  <input type="text" id="tx-characteristic" value="6E400003-B5A3-F393-EOA9-E50E24DCCA9E" placeholder="e.g., 0x2A38"><br><br>
+
+  <button onclick="onStartButtonClick()">Start RX/TX</button>
+  <button onclick="onStopButtonClick()">Stop TX Notifications</button>
 
   <div id="log"></div>
 
   <script>
-    var myCharacteristic;
+    var rxCharacteristic;
+    var txCharacteristic;
 
     function log(message) {
       const logDiv = document.getElementById('log');
@@ -52,9 +56,14 @@
         serviceUuid = parseInt(serviceUuid);
       }
 
-      let characteristicUuid = document.querySelector('#characteristic').value;
-      if (characteristicUuid.startsWith('0x')) {
-        characteristicUuid = parseInt(characteristicUuid);
+      let rxCharacteristicUuid = document.querySelector('#rx-characteristic').value;
+      if (rxCharacteristicUuid.startsWith('0x')) {
+        rxCharacteristicUuid = parseInt(rxCharacteristicUuid);
+      }
+
+      let txCharacteristicUuid = document.querySelector('#tx-characteristic').value;
+      if (txCharacteristicUuid.startsWith('0x')) {
+        txCharacteristicUuid = parseInt(txCharacteristicUuid);
       }
 
       log('Requesting Bluetooth Device...');
@@ -68,19 +77,29 @@
         return server.getPrimaryService(serviceUuid);
       })
       .then(service => {
-        log('Getting Characteristic...');
-        return service.getCharacteristic(characteristicUuid);
+        log('Getting RX Characteristic...');
+        return service.getCharacteristic(rxCharacteristicUuid);
       })
       .then(characteristic => {
-        myCharacteristic = characteristic;
-        return myCharacteristic.startNotifications().then(_ => {
-          log('> Notifications started');
-          myCharacteristic.addEventListener('characteristicvaluechanged',
-              handleNotifications);
-          // Write "Hello" after starting notifications
+        rxCharacteristic = characteristic;
+
+        log('Getting TX Characteristic...');
+        return rxCharacteristic.service.getCharacteristic(txCharacteristicUuid);
+      })
+      .then(characteristic => {
+        txCharacteristic = characteristic;
+
+        // Start notifications on the TX characteristic
+        return txCharacteristic.startNotifications().then(_ => {
+          log('> TX Notifications started');
+          txCharacteristic.addEventListener('characteristicvaluechanged', handleNotifications);
+
+          // Write "Hello" to the RX characteristic
           const encoder = new TextEncoder();
           const data = encoder.encode('Hello');
-          return myCharacteristic.writeValue(data);
+          return rxCharacteristic.writeValue(data).then(() => {
+            log('> Sent "Hello" to RX');
+          });
         });
       })
       .catch(error => {
@@ -89,12 +108,11 @@
     }
 
     function onStopButtonClick() {
-      if (myCharacteristic) {
-        myCharacteristic.stopNotifications()
+      if (txCharacteristic) {
+        txCharacteristic.stopNotifications()
         .then(_ => {
-          log('> Notifications stopped');
-          myCharacteristic.removeEventListener('characteristicvaluechanged',
-              handleNotifications);
+          log('> TX Notifications stopped');
+          txCharacteristic.removeEventListener('characteristicvaluechanged', handleNotifications);
         })
         .catch(error => {
           log('Argh! ' + error);
@@ -104,17 +122,21 @@
 
     function handleNotifications(event) {
       let value = event.target.value;
-      let a = [];
-      // Convert raw data bytes to hex values just for the sake of showing something.
-      // In the "real" world, you'd use data.getUint8, data.getUint16 or even
-      // TextDecoder to process raw data bytes.
+      let hexValues = [];
+      let asciiValues = [];
+
+      // Convert raw data bytes to hex and ASCII values
       for (let i = 0; i < value.byteLength; i++) {
-        a.push('0x' + ('00' + value.getUint8(i).toString(16)).slice(-2));
+        let byte = value.getUint8(i);
+        hexValues.push('0x' + ('00' + byte.toString(16)).slice(-2));
+        asciiValues.push(byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : '.'); // Printable ASCII or .
       }
-      log('> ' + a.join(' '));
+
+      log('> Notification received from TX:');
+      log('   Hex: ' + hexValues.join(' '));
+      log('   ASCII: ' + asciiValues.join(''));
     }
   </script>
 
 </body>
 </html>
-
