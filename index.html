@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bluetooth Notification Example (カラオケ現在曲目取得)</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    #log {
+      margin-top: 20px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      height: 200px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+    button {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Bluetooth Notifications</h1>
+
+  <label for="service">Service UUID: </label>
+  <input type="text" id="service" value="8371c46d-9796-4a80-9411-cc738dcdb5ee" placeholder="e.g., 8371c46d-9796-4a80-9411-cc738dcdb5ee"><br><br>
+
+  <label for="characteristic">Characteristic UUID: </label>
+  <input type="text" id="characteristic" value="d29c26db-e005-4345-ac6b-bb13c363b6b8" placeholder="e.g., d29c26db-e005-4345-ac6b-bb13c363b6b8"><br><br>
+
+  <button onclick="onStartButtonClick()">Start Notifications</button>
+  <button onclick="onStopButtonClick()">Stop Notifications</button>
+
+  <div id="log"></div>
+
+  <script>
+    var myCharacteristic;
+
+    function log(message) {
+      const logDiv = document.getElementById('log');
+      logDiv.textContent += message + '\n';
+      logDiv.scrollTop = logDiv.scrollHeight; // Scroll to the bottom
+    }
+
+    function onStartButtonClick() {
+      let serviceUuid = document.querySelector('#service').value;
+      if (serviceUuid.startsWith('0x')) {
+        serviceUuid = parseInt(serviceUuid);
+      }
+
+      let characteristicUuid = document.querySelector('#characteristic').value;
+      if (characteristicUuid.startsWith('0x')) {
+        characteristicUuid = parseInt(characteristicUuid);
+      }
+
+      log('Requesting Bluetooth Device...');
+      navigator.bluetooth.requestDevice({filters: [{services: [serviceUuid]}]})
+      .then(device => {
+        log('Connecting to GATT Server...');
+        return device.gatt.connect();
+      })
+      .then(server => {
+        log('Getting Service...');
+        return server.getPrimaryService(serviceUuid);
+      })
+      .then(service => {
+        log('Getting Characteristic...');
+        return service.getCharacteristic(characteristicUuid);
+      })
+      .then(characteristic => {
+        myCharacteristic = characteristic;
+        return myCharacteristic.startNotifications().then(_ => {
+          log('> Notifications started');
+          myCharacteristic.addEventListener('characteristicvaluechanged',
+              handleNotifications);
+          // Write "Hello" after starting notifications
+          const encoder = new TextEncoder();
+          const data = encoder.encode('Hello');
+          return myCharacteristic.writeValue(data);
+        });
+      })
+      .catch(error => {
+        log('Argh! ' + error);
+      });
+    }
+
+    function onStopButtonClick() {
+      if (myCharacteristic) {
+        myCharacteristic.stopNotifications()
+        .then(_ => {
+          log('> Notifications stopped');
+          myCharacteristic.removeEventListener('characteristicvaluechanged',
+              handleNotifications);
+        })
+        .catch(error => {
+          log('Argh! ' + error);
+        });
+      }
+    }
+
+    function handleNotifications(event) {
+      let value = event.target.value;
+      let a = [];
+      // Convert raw data bytes to hex values just for the sake of showing something.
+      // In the "real" world, you'd use data.getUint8, data.getUint16 or even
+      // TextDecoder to process raw data bytes.
+      for (let i = 0; i < value.byteLength; i++) {
+        a.push('0x' + ('00' + value.getUint8(i).toString(16)).slice(-2));
+      }
+      log('> ' + a.join(' '));
+    }
+  </script>
+
+</body>
+</html>
+
