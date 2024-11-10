@@ -136,16 +136,18 @@
 
       // Convert raw data bytes to hex and ASCII values
       for (let i = 0; i < value.byteLength; i++) {
-        let byte = value.getUint8(i);
-        hexValues.push('0x' + ('00' + byte.toString(16)).slice(-2));
+      let byte = value.getUint8(i);
+      hexValues.push('0x' + ('00' + byte.toString(16)).slice(-2));
+      if (byte === 10) { // LF (line feed) character
+        asciiValues += '\n';
+      } else {
         asciiValues += (byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : '.'); // Printable ASCII or .
       }
+      }
 
-      //log('> Notification received from TX:');
-      //log('   Hex: ' + hexValues.join(' '));
-      if (asciiValues.endsWith('.')) {
-        log('received: \n' + asciiValues);
-        asciiValues = "";
+      if (asciiValues.endsWith('\n')) {
+      log('received: \n' + asciiValues);
+      asciiValues = "";
       }
     }
   </script>
