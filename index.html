@@ -35,6 +35,9 @@
   <label for="tx-characteristic">TX Characteristic UUID: </label>
   <input type="text" id="tx-characteristic" value="6e400003-b5a3-f393-e0a9-e50e24dcca9e" placeholder="e.g., 0x2A38"><br><br>
 
+  <label for="command">Command: </label>
+  <input type="text" id="command" value="SLOTS" placeholder="e.g., SLOTS"><br><br>
+
   <button onclick="onStartButtonClick()">Start RX/TX</button>
   <button onclick="onStopButtonClick()">Stop TX Notifications</button>
 
@@ -64,6 +67,12 @@
       let txCharacteristicUuid = document.querySelector('#tx-characteristic').value;
       if (txCharacteristicUuid.startsWith('0x')) {
         txCharacteristicUuid = parseInt(txCharacteristicUuid);
+      }
+
+      const commandSuffix = '\n';
+      let command = document.querySelector('#command').value;
+      if (!command.endsWith(commandSuffix)) {
+        command += commandSuffix;
       }
 
       log('Requesting Bluetooth Device...');
@@ -96,9 +105,9 @@
 
           // Write "Hello" to the RX characteristic
           const encoder = new TextEncoder();
-          const data = encoder.encode('Hello');
+          const data = encoder.encode(command);
           return rxCharacteristic.writeValue(data).then(() => {
-            log('> Sent "Hello" to RX');
+            log(`> Sent "${command}" to RX`);
           });
         });
       })
