@@ -24,7 +24,7 @@
 </head>
 <body>
 
-  <h1>Bluetooth RX/TX Notifications</h1>
+  <h1>Bluetooth KaraUSB Notifications</h1>
 
   <label for="service">Service UUID: </label>
   <input type="text" id="service" value="8371c46d-9796-4a80-9411-cc738dcdb5ee" placeholder="e.g., 0x180D"><br><br>
@@ -40,8 +40,10 @@
 
   <button onclick="onStartButtonClick()">Start RX/TX</button>
   <!-- <button onclick="onStopButtonClick()">Stop TX Notifications</button> -->
-  <button onclick="sendCommand()">Send Command</button>
-  <button onclick="sendStatusJsonCommand()">Send STATUS_JSON Command</button>
+  <button onclick="sendCommand()">Send Command</button><br>
+
+  <button onclick="startAutoSend()">Start Auto Send STATUS_JSON</button>
+  <button onclick="stopAutoSend()">Stop Auto Send STATUS_JSON</button>
 
   <div id="slots"></div>
   <div id="reservations"></div>
@@ -51,6 +53,24 @@
   <script>
     var rxCharacteristic;
     var txCharacteristic;
+
+    var autoSendInterval;
+
+    function startAutoSend() {
+      if (!autoSendInterval) {
+        sendStatusJsonCommand();
+        autoSendInterval = setInterval(sendStatusJsonCommand, 5000);
+        log('Auto send STATUS_JSON started');
+      }
+    }
+
+    function stopAutoSend() {
+      if (autoSendInterval) {
+        clearInterval(autoSendInterval);
+        autoSendInterval = null;
+        log('Auto send STATUS_JSON stopped');
+      }
+    }
 
     function log(message) {
       const logDiv = document.getElementById('log');
