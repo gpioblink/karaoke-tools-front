@@ -39,7 +39,8 @@
   <input type="text" id="command" value="SLOTS" placeholder="e.g., SLOTS"><br><br>
 
   <button onclick="onStartButtonClick()">Start RX/TX</button>
-  <button onclick="onStopButtonClick()">Stop TX Notifications</button>
+  <!-- <button onclick="onStopButtonClick()">Stop TX Notifications</button> -->
+  <button onclick="sendCommand()">Send Command</button>
   <button onclick="sendStatusJsonCommand()">Send STATUS_JSON Command</button>
 
   <div id="log"></div>
@@ -145,7 +146,8 @@
         if (byte === 10) { // LF (line feed) character
           asciiValues += '\n';
         } else if (byte === 0) { // NULL character
-          log('received: \n' + asciiValues);
+          log('received: \n' + asciiValues);          
+          handleJson(asciiValues);
           asciiValues = "";
         } else {
           asciiValues += (byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : ''); // Printable ASCII or ignore
@@ -154,12 +156,17 @@
     }
 
     function handleJson(jsonText) {
-      let json = JSON.parse(jsonText);
-      let slots = json.slots;
-      let reservations = json.reservations;
+      try {
+        let json = JSON.parse(jsonText);
+        let slots = json.slots;
+        let reservations = json.reservations;
 
-      displaySlots(slots);
-      displayReservations(reservations);
+        displaySlots(slots);
+        displayReservations(reservations);
+      } catch (error) {
+        log('Error parsing JSON: ' + error);
+        asciiValues = ""; // Clear the buffer
+      }
     }
 
     function displaySlots(slots) {
@@ -193,6 +200,21 @@
         const data = encoder.encode(command);
         rxCharacteristic.writeValue(data).then(() => {
           log(`> Sent "${command.trim()}" to RX`);
+        }).catch(error => {
+          log('Argh! ' + error);
+        });
+      } else {
+        log('RX Characteristic is not available.');
+      }
+    }
+
+    function sendCommand() {
+      const command = document.querySelector('#command').value;
+      if (rxCharacteristic) {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(command + '\n');
+        rxCharacteristic.writeValue(data).then(() => {
+          log(`> Sent "${command}" to RX`);
         }).catch(error => {
           log('Argh! ' + error);
         });
