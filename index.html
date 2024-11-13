@@ -40,8 +40,12 @@
 
   <button onclick="onStartButtonClick()">Start RX/TX</button>
   <button onclick="onStopButtonClick()">Stop TX Notifications</button>
+  <button onclick="sendStatusJsonCommand()">Send STATUS_JSON Command</button>
 
   <div id="log"></div>
+
+  <div id="slots"></div>
+  <div id="reservations"></div>
 
   <script>
     var rxCharacteristic;
@@ -136,18 +140,64 @@
 
       // Convert raw data bytes to hex and ASCII values
       for (let i = 0; i < value.byteLength; i++) {
-      let byte = value.getUint8(i);
-      hexValues.push('0x' + ('00' + byte.toString(16)).slice(-2));
-      if (byte === 10) { // LF (line feed) character
-        asciiValues += '\n';
-      } else {
-        asciiValues += (byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : '.'); // Printable ASCII or .
+        let byte = value.getUint8(i);
+        hexValues.push('0x' + ('00' + byte.toString(16)).slice(-2));
+        if (byte === 10) { // LF (line feed) character
+          asciiValues += '\n';
+        } else if (byte === 0) { // NULL character
+          log('received: \n' + asciiValues);
+          asciiValues = "";
+        } else {
+          asciiValues += (byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : ''); // Printable ASCII or ignore
+        }
       }
-      }
+    }
 
-      if (asciiValues.endsWith('.')) {
-      log('received: \n' + asciiValues);
-      asciiValues = "";
+    function handleJson(jsonText) {
+      let json = JSON.parse(jsonText);
+      let slots = json.slots;
+      let reservations = json.reservations;
+
+      displaySlots(slots);
+      displayReservations(reservations);
+    }
+
+    function displaySlots(slots) {
+      const slotsDiv = document.getElementById('slots');
+      slotsDiv.innerHTML = '<h2>Slots</h2>';
+      const ul = document.createElement('ul');
+      slots.forEach(slot => {
+        const li = document.createElement('li');
+        li.innerHTML = `ID: ${slot.id}, State: ${slot.state}, Seq: ${slot.seq}, Video: ${slot.video}, Is Writing: ${slot.isWriting}`;
+        ul.appendChild(li);
+      });
+      slotsDiv.appendChild(ul);
+    }
+
+    function displayReservations(reservations) {
+      const reservationsDiv = document.getElementById('reservations');
+      reservationsDiv.innerHTML = '<h2>Reservations</h2>';
+      const ul = document.createElement('ul');
+      reservations.forEach(reservation => {
+        const li = document.createElement('li');
+        li.innerHTML = `Seq: ${reservation.seq}, Request No: ${reservation.requestNo}`;
+        ul.appendChild(li);
+      });
+      reservationsDiv.appendChild(ul);
+    }
+
+    function sendStatusJsonCommand() {
+      const command = 'STATUS_JSON\n';
+      if (rxCharacteristic) {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(command);
+        rxCharacteristic.writeValue(data).then(() => {
+          log(`> Sent "${command.trim()}" to RX`);
+        }).catch(error => {
+          log('Argh! ' + error);
+        });
+      } else {
+        log('RX Characteristic is not available.');
       }
     }
   </script>
